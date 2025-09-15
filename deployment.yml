@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: bms-app
+  namespace: sunmarsh
   labels:
     app: bms
 spec:
@@ -16,6 +17,6 @@ spec:
     spec:
       containers:
       - name: bms-container
-        image: kastrov/bms:latest  # Replace with your Docker image
+        image: sunmarsh/bms:latest  
         ports:
-        - containerPort: 3000  # Replace with the port your app runs on
+        - containerPort: 3000 

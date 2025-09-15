@@ -2,12 +2,13 @@ apiVersion: v1
 kind: Service
 metadata:
   name: bms-service
+  namespace: sunmarsh
   labels:
     app: bms
 spec:
   type: LoadBalancer
   ports:
   - port: 80
-    targetPort: 3000  # Replace with the port your app runs on
+    targetPort: 3000 
   selector:
     app: bms

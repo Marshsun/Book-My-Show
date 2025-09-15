@@ -1,20 +1,18 @@
-(with K8S Stage)
-
 pipeline {
     agent any
 
     tools {
-        jdk 'jdk17'
-        nodejs 'node23'
+        jdk 'jdk-21'
+        nodejs 'node-js'
     }
 
     environment {
-        SCANNER_HOME = tool 'sonar-scanner'
-        DOCKER_IMAGE = 'akshu20791/bms:latest'
-        EKS_CLUSTER_NAME = 'akshat-eks'
-        AWS_REGION = 'us-east-1'
+        SCANNER_HOME = tool 'sonar'
+        DOCKER_IMAGE = 'sunmarsh/bms:latest'
+        EKS_CLUSTER_NAME = 'sunmarshcluster'
+        AWS_REGION = 'us-west-1'
     }
-
+    
     stages {
         stage('Clean Workspace') {
             steps {
@@ -24,7 +22,7 @@ pipeline {
 
         stage('Checkout from Git') {
             steps {
-                git branch: 'main', url: 'https://github.com/akshu20791/Book-My-Show.git'
+                git branch: 'main', credentialsId: 'github-creds', url: 'https://github.com/Marshsun/Book-My-Show.git'
                 sh 'ls -la'  // Verify files after checkout
             }
         }
@@ -34,8 +32,8 @@ pipeline {
                 withSonarQubeEnv('sonar-server') {
                     sh ''' 
                     $SCANNER_HOME/bin/sonar-scanner \
-                        -Dsonar.projectName=BMS \
-                        -Dsonar.projectKey=BMS
+                        -Dsonar.projectKey=Book-My-Show-DevOps-Project \
+                        -Dsonar.projectName='Book-My-Show DevOps Project' 
                     '''
                 }
             }
@@ -44,7 +42,11 @@ pipeline {
         stage('Quality Gate') {
             steps {
                 script {
-                    waitForQualityGate abortPipeline: false, credentialsId: 'Sonar-token'
+                    // Added timeout to avoid infinite waiting
+                    timeout(time: 1, unit: 'MINUTES') {
+                        def qg = waitForQualityGate abortPipeline: true, credentialsId: 'sonar-creds'
+                        echo "Quality Gate status: ${qg.status}"
+                    }
                 }
             }
         }
@@ -73,15 +75,25 @@ pipeline {
         }
 
         stage('Trivy FS Scan') {
-            steps {
-                sh 'trivy fs . > trivyfs.txt'
-            }
-        }
+    steps {
+        sh '''
+        if ! command -v trivy &> /dev/null
+        then
+            echo "Trivy not installed! Skipping scan."
+            exit 0
+        fi
+
+        echo "Running Trivy FS scan..."
+        trivy fs . > trivyfs.txt
+        '''
+    }
+}
+
 
         stage('Docker Build & Push') {
             steps {
                 script {
-                    withDockerRegistry(credentialsId: 'docker', toolName: 'docker') {
+                    withDockerRegistry(credentialsId: 'dockerhub-creds', toolName: 'docker') {
                         sh ''' 
                         echo "Building Docker image..."
                         docker build --no-cache -t $DOCKER_IMAGE -f bookmyshow-app/Dockerfile bookmyshow-app
@@ -127,7 +139,7 @@ pipeline {
                 body: "Project: ${env.JOB_NAME}<br/>" +
                       "Build Number: ${env.BUILD_NUMBER}<br/>" +
                       "URL: ${env.BUILD_URL}<br/>",
-                to: 'kastrokiran@gmail.com',
+                to: 'sunmarshkumar2002@gmail.com',
                 attachmentsPattern: 'trivyfs.txt'
         }
     }
